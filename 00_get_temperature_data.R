@@ -9,10 +9,10 @@ sf_use_s2(use_s2 = FALSE)
 dist <- get_districts()
 prov <- get_provinces()
 dep <-  get_departaments()
-box <- dep |> 
-  summarise() |> 
-  st_bbox() |> 
-  st_as_sfc() |> 
+box <- dep |>
+  summarise() |>
+  st_bbox() |>
+  st_as_sfc() |>
   sf_as_ee()
 # 2. MODIS data -----------------------------------------------------------
 ee_year <- seq(from = 2001, to = 2024, by = 1) |> ee$List()
@@ -25,7 +25,7 @@ filter.clear.sky <- function(image) {
   clearDaysCount <- clearSky$bitwiseAnd(255)$toUint8()$bitCount()
   mask <-  clearDaysCount$gte(3)
   image <- image$select("LST_Day_1km")$updateMask(mask)
-  return(image) 
+  return(image)
 }
 
 modis.db <- ee$ImageCollection$fromImages(
@@ -40,8 +40,8 @@ modis.db <- ee$ImageCollection$fromImages(
         }
       )
     )
-  ) |> 
-  ee$ImageCollection$toBands() |> 
+  ) |>
+  ee$ImageCollection$toBands() |>
   ee$Image$clip(box)
 
 # 3. Download raster data -------------------------------------------------
@@ -64,44 +64,51 @@ r_filled <- focal(
 
 # 4. Zonal statistic by administration limits  ----------------------------
 anios <- 2001:2024
-names(lst) <- gsub(
+names(r_filled) <- gsub(
   ".*(lst).*",
   "\\1",
-  str_to_lower(names(lst))) |> 
+  str_to_lower(names(r_filled))) |>
   paste0("_mean_",anios)
 
-dist |> 
-  st_transform(32718) |> 
+dist |>
+  select(UBIGEO) |>
+  st_transform(32718) |>
   vect() |>
   terra::extract(
     x = r_filled,
     fun = "mean",
     bind = TRUE,
-    na.rm=TRUE) |> 
-  st_as_sf() |> 
-  st_drop_geometry() |> 
+    na.rm=TRUE) |>
+  st_as_sf()  |>
+  st_drop_geometry() |>
   write_csv(file = "output/lst_mean_yearly_peru_district_2001-2024.csv")
 
-prov |> 
-  st_transform(32718) |> 
-  vect() |> 
+prov |>
+  mutate(UBIGEO = paste0(CCDD,CCPP))|>
+  select(UBIGEO)|>
+  st_transform(32718) |>
+  vect() |>
   terra::extract(
     x = r_filled,
     fun = "mean",
     bind = TRUE,
-    na.rm=TRUE) |> 
-  st_as_sf() |> 
-  st_drop_geometry() |> 
+    na.rm=TRUE) |>
+  st_as_sf()  |>
+  st_drop_geometry() |>
   write_csv(file = "output/lst_mean_yearly_peru_province_2001-2024.csv")
 
-dep |> 
-  st_transform(32718) |> 
-  vect() |> 
+dist |>
+  group_by(CCDD,NOMBDEP) |>
+  summarise() |>
+  select(CCDD) |>
+  rename(UBIGEO = CCDD) |>
+  st_transform(32718) |>
+  vect() |>
   terra::extract(
     x = r_filled,
     fun = "mean",
     bind = TRUE,
-    na.rm=TRUE) |> 
-  st_as_sf() |> 
-  st_drop_geometry() |> 
+    na.rm=TRUE) |>
+  st_as_sf()  |>
+  st_drop_geometry() |>
   write_csv(file = "output/lst_mean_yearly_peru_departament_2001-2024.csv")
