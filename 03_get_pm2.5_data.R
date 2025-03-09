@@ -14,40 +14,30 @@ box <- dep |>
   st_bbox() |>
   st_as_sfc() |>
   sf_as_ee()
-# 2. MODIS data -----------------------------------------------------------
-ee_year <- seq(from = 2001, to = 2024, by = 1) |> ee$List()
-ic <- ee$ImageCollection("UCSB-CHG/CHIRPS/PENTAD") |>
-  ee$ImageCollection$filter(ee$Filter$calendarRange(1,12,"month"))
 
-chirps.db <- ee$ImageCollection$fromImages(
-  ee_year$map(
-    ee_utils_pyfunc(
-      function(x){
-        ic$filter(ee$Filter$calendarRange(x,x,"year"))$
-          mean()
-      }
-    )
-  )
-) |>
+# 2. GHAP data ------------------------------------------------------------
+ghap.db <- ee$ImageCollection("projects/sat-io/open-datasets/GLOBAL-SATELLITE-PM25/ANNUAL") |>
+  ee$ImageCollection$filter(ee$Filter$calendarRange(2001,2022,"year")) |>
   ee$ImageCollection$toBands() |>
   ee$Image$clip(box)
 
 # 3. Download raster data -------------------------------------------------
 if(!dir.create("output")){dir.create("output")}
 if(!dir.create("output/raster")){dir.create("output/raster")}
-pp <-  ee_as_rast(
-  image = chirps.db,
+pm2.5 <-  ee_as_rast(
+  image = ghap.db,
   region = box,
-  dsn = 'output/raster/chirps_pp.tif',
-  scale = 5566,
+  dsn = 'output/raster/ghap_pm25.tif',
+  scale = 1000,
   crs = "epsg:32718")
 
 # 4. Zonal statistic by administration limits  ----------------------------
-anios <- 2001:2024
-names(pp) <- gsub(
-  ".*(precipitation).*",
+anios <- 2001:2022
+names(pm2.5) <- gsub(
+  ".*(V6GL02).*",
   "\\1",
-  str_to_lower(names(pp))) |>
+  names(pm2.5)) |>
+  tolower() |>
   paste0("_mean_",anios)
 
 dist |>
@@ -55,13 +45,13 @@ dist |>
   st_transform(32718) |>
   vect() |>
   terra::extract(
-    x = pp,
+    x = pm2.5,
     fun = "mean",
     bind = TRUE,
     na.rm=TRUE) |>
   st_as_sf()  |>
   st_drop_geometry() |>
-  write_csv(file = "output/pp_mean_yearly_peru_district_2001-2024.csv")
+  write_csv(file = "output/pm2.5_mean_yearly_peru_district_2001-2022.csv")
 
 prov |>
   mutate(ubigeo = paste0(ccdd,ccpp))|>
@@ -69,13 +59,13 @@ prov |>
   st_transform(32718) |>
   vect() |>
   terra::extract(
-    x = pp,
+    x = pm2.5,
     fun = "mean",
     bind = TRUE,
     na.rm=TRUE) |>
   st_as_sf()  |>
   st_drop_geometry() |>
-  write_csv(file = "output/pp_mean_yearly_peru_province_2001-2024.csv")
+  write_csv(file = "output/pm2.5_mean_yearly_peru_province_2001-2022.csv")
 
 dist |>
   group_by(ccdd,nombdep) |>
@@ -85,10 +75,10 @@ dist |>
   st_transform(32718) |>
   vect() |>
   terra::extract(
-    x = pp,
+    x = pm2.5,
     fun = "mean",
     bind = TRUE,
     na.rm=TRUE) |>
   st_as_sf()  |>
   st_drop_geometry() |>
-  write_csv(file = "output/pp_mean_yearly_peru_departament_2001-2024.csv")
+  write_csv(file = "output/pm2.5_mean_yearly_peru_departament_2001-2022.csv")
