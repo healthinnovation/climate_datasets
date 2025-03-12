@@ -19,6 +19,17 @@ for (file in file_list) {
   }
 }
 
+rename_first_column <- function(df) {
+  if (ncol(df) > 0) colnames(df)[1] <- "UBIGEO"
+  return(df)
+}
+
+# ✅ Aplicar a todas las listas de manera uniforme
+data_departamento <- lapply(data_departamento, rename_first_column)
+data_provincia <- lapply(data_provincia, rename_first_column)
+data_distrito <- lapply(data_distrito, rename_first_column)
+
+
 format_ubigeo <- function(ubigeo, type) {
   ubigeo <- as.character(ubigeo)
 
@@ -53,6 +64,7 @@ format_ubigeo <- function(ubigeo, type) {
   return("")
 }
 
+
 if (length(data_departamento) > 0) {
   data_departamento <- lapply(data_departamento, function(df) {
     if ("UBIGEO" %in% colnames(df)) {
@@ -63,25 +75,27 @@ if (length(data_departamento) > 0) {
   })
 }
 
-if (length(data_provincia) > 0) {
-  data_provincia <- lapply(data_provincia, function(df) {
-    if ("UBIGEO" %in% colnames(df)) {
-      df$UBIGEO <- sapply(df$UBIGEO, format_ubigeo, type = "provincia")
-      df <- df[order(as.numeric(df$UBIGEO)), ]
+apply_format <- function(data_list, type) {
+  if (length(data_list) > 0) {
+    for (i in seq_along(data_list)) {
+      if ("UBIGEO" %in% colnames(data_list[[i]])) {
+        # Aplicar formato con sapply()
+        data_list[[i]]$UBIGEO <- sapply(data_list[[i]]$UBIGEO, format_ubigeo, type = type)
+
+        # Si deseas ordenar, deja esta línea; si no, elimínala
+        data_list[[i]] <- data_list[[i]][order(as.numeric(data_list[[i]]$UBIGEO)), ]
+      }
     }
-    return(df)
-  })
+  }
+  return(data_list)
 }
 
-if (length(data_distrito) > 0) {
-  data_distrito <- lapply(data_distrito, function(df) {
-    if ("UBIGEO" %in% colnames(df)) {
-      df$UBIGEO <- sapply(df$UBIGEO, format_ubigeo, type = "distrito")
-      df <- df[order(as.numeric(df$UBIGEO)), ]
-    }
-    return(df)
-  })
-}
+# ✅ Aplicar formato para cada lista
+data_departamento <- apply_format(data_departamento, "departamento")
+data_provincia <- apply_format(data_provincia, "provincia")
+data_distrito <- apply_format(data_distrito, "distrito")
+
+output_folder<-"output_format"
 
 export_data <- function(data_list, output_folder) {
   if (length(data_list) > 0) {
